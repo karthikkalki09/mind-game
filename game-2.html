@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Set viewport for mobile devices -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deep Think</title>
+  <!-- Bootstrap CSS & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+  <style>
+    /* Global Styles (Mobile Friendly) */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      touch-action: manipulation;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #74ABE2, #5563DE);
+      transition: background 1s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Sign-Up Screen */
+    #signupContainer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 200;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #signupForm {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 350px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+    /* Game Container & Canvas */
+    #gameContainer {
+      display: none;
+      position: relative;
+      height: 100vh;
+      width: 100vw;
+    }
+    #gameCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: #fff;
+    }
+    #miniMapCanvas {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      width: 100px;
+      height: 100px;
+      border: 2px solid #666;
+      background: rgba(255,255,255,0.9);
+      z-index: 3;
+      border-radius: 5px;
+    }
+    /* Game Info (Level & Score) */
+    #gameInfo {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      z-index: 4;
+      color: #fff;
+      background: rgba(0,0,0,0.6);
+      padding: 0.5rem;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+    /* Control Panel */
+    #controlPanel {
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+    }
+    #controlPanel button {
+      margin: 0.3rem;
+      padding: 0.6rem;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 5px;
+      background: #007BFF;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.3s;
+    }
+    #controlPanel button:hover {
+      background: #0056b3;
+      transform: translateY(-2px);
+    }
+    /* "Good!" Message Animation */
+    #goodMessage {
+      position: absolute;
+      z-index: 5;
+      padding: 0.5rem 1rem;
+      background: rgba(0,200,0,0.85);
+      color: #fff;
+      border-radius: 8px;
+      font-size: 1rem;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    /* Confetti Effect */
+    .confetti-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 10;
+    }
+    .confetti {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      opacity: 0.8;
+      animation: fall 3s linear forwards;
+    }
+    @keyframes fall {
+      to {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+      }
+    }
+    /* Landing Page Overlay */
+    #menuOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 15;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.5s;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    /* Dynamic landing title animation */
+    .landing-title {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sign-Up Page -->
+  <div id="signupContainer">
+    <div id="signupForm">
+      <h2 class="mb-3">Sign Up</h2>
+      <input type="email" id="email" class="form-control mb-2" placeholder="Email" required />
+      <input type="password" id="password" class="form-control mb-2" placeholder="Password" required />
+      <input type="password" id="confirmPassword" class="form-control mb-3" placeholder="Confirm Password" required />
+      <button id="signupButton" class="btn btn-primary w-100">Sign Up</button>
+    </div>
+  </div>
+
+  <!-- Game Container -->
+  <div id="gameContainer">
+    <!-- Level & Score Info -->
+    <div id="gameInfo">
+      Level: <span id="levelDisplay">1</span> | Score: <span id="scoreDisplay">0</span>
+    </div>
+
+    <!-- Main Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Mini Map Canvas -->
+    <canvas id="miniMapCanvas" width="100" height="100"></canvas>
+
+    <!-- Control Panel -->
+    <div id="controlPanel">
+      <button id="restartBtn" title="Restart"><i class="bi bi-arrow-repeat"></i></button>
+      <button id="undoBtn" title="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
+      <button id="pauseBtn" title="Pause"><i class="bi bi-pause-fill"></i></button>
+      <button id="clueBtn" title="Clue"><i class="bi bi-lightbulb-fill"></i></button>
+    </div>
+
+    <!-- "Good!" Effect -->
+    <div id="goodMessage">Good!</div>
+    
+    <!-- Menu Overlay (Landing, Pause & Level Complete) -->
+    <div id="menuOverlay"></div>
+  </div>
+
+  <!-- Account Credentials Modal -->
+  <div class="modal fade" id="accountModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+         <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-person-circle"></i> Account Details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body">
+            <p><i class="bi bi-envelope"></i> <strong>Email:</strong> <span id="modalEmailDisplay"></span></p>
+            <p><i class="bi bi-volume-up"></i> <strong>Sound Effects:</strong> <span id="modalSoundDisplay"></span></p>
+            <p><i class="bi bi-controller"></i> <strong>Game Mode:</strong> <span id="modalGameModeDisplay"></span></p>
+            <p><i class="bi bi-lightbulb"></i> <strong>Hints Enabled:</strong> <span id="modalHintsDisplay"></span></p>
+            <p><i class="bi bi-display"></i> <strong>Graphics Quality:</strong> <span id="modalGraphicsDisplay"></span></p>
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard Modal -->
+  <div class="modal fade" id="leaderboardModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+         <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-trophy"></i> Leaderboard</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body" id="leaderboardContent">
+            <!-- Leaderboard data will be injected here -->
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="modal fade" id="helpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+         <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-info-circle"></i> Help</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body">
+            <p>
+              <strong>Instructions:</strong><br>
+              Connect the nodes in the correct (non‑sequential) order. Only a few nodes are revealed at a time.
+              Use the clue button if needed. Your score increases based on level difficulty and node count.
+              Enjoy dynamic backgrounds, confetti effects on level completion, and immersive sound effects.
+              Have fun and challenge yourself!
+            </p>
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+         <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-gear"></i> Settings</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body">
+            <form id="settingsForm">
+              <div class="mb-3">
+                <label for="soundToggle" class="form-label">Sound Effects</label>
+                <select id="soundToggle" class="form-select">
+                  <option value="on" selected>On</option>
+                  <option value="off">Off</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="gameMode" class="form-label">Game Mode</label>
+                <select id="gameMode" class="form-select">
+                  <option value="classic" selected>Classic</option>
+                  <option value="arcade">Arcade</option>
+                  <option value="hardcore">Hardcore</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="hintsToggle" class="form-label">Enable Hints</label>
+                <select id="hintsToggle" class="form-select">
+                  <option value="yes" selected>Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="graphicsQuality" class="form-label">Graphics Quality</label>
+                <select id="graphicsQuality" class="form-select">
+                  <option value="high" selected>High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary w-100">Save Settings</button>
+            </form>
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Level Complete Modal -->
+  <div class="modal fade" id="levelCompleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+         <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-check-circle"></i> Level Complete!</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body text-center">
+            <p>What would you like to do next?</p>
+            <div class="d-grid gap-2">
+              <button id="playAgainBtn" class="btn btn-warning">Play Again</button>
+              <button id="nextLevelBtn" class="btn btn-success">Next Level</button>
+            </div>
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Effects -->
+  <audio id="successSound" src="https://www.soundjay.com/button/sounds/button-3.mp3"></audio>
+  <audio id="completeSound" src="https://www.soundjay.com/button/sounds/button-09.mp3"></audio>
+
+  <!-- Bootstrap JS (for modals & dropdowns) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    /***** Global Variables *****/
+    let userEmail = "";
+    let score = 0;
+    // Settings variables
+    let soundEnabled = true;
+    let gameMode = "classic";
+    let hintsEnabled = true;
+    let graphicsQuality = "high";
+    
+    // Dummy leaderboard data (for demo)
+    let leaderboardData = [
+      { email: "alice@example.com", score: 1500 },
+      { email: "bob@example.com", score: 1200 },
+      { email: "charlie@example.com", score: 900 }
+    ];
+    
+    /***** Level Generation & Order *****/
+    function generateLevel(levelNumber) {
+      let nodes = [];
+      // Start at 4 nodes, add one every 10 levels (max 20)
+      const nodeCount = Math.min(4 + Math.floor((levelNumber - 1) / 10), 20);
+      const centerX = 0.5, centerY = 0.5, radius = 0.3;
+      for (let i = 0; i < nodeCount; i++) {
+        let angle = (2 * Math.PI * i) / nodeCount;
+        angle += (Math.random() - 0.5) * (Math.PI / 12);
+        let randomScale = 0.9 + (Math.random() - 0.5) * 0.1;
+        let x = centerX + radius * Math.cos(angle) * randomScale;
+        let y = centerY + radius * Math.sin(angle) * randomScale;
+        let shape = "circle";
+        if (levelNumber < 50) {
+          shape = (i % 2 === 0) ? "circle" : "square";
+        } else if (levelNumber < 150) {
+          let shapes = ["circle", "square", "rectangle"];
+          shape = shapes[i % shapes.length];
+        } else {
+          let shapes = ["circle", "square", "rectangle", "rhombus"];
+          shape = shapes[i % shapes.length];
+        }
+        nodes.push({ x, y, shape });
+      }
+      return nodes;
+    }
+    function generateOrder(nodeCount) {
+      let order = [];
+      for (let i = 0; i < nodeCount; i++) {
+        order.push(i);
+      }
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      return order;
+    }
+    // Generate 500 levels.
+    let levels = [];
+    for (let lvl = 1; lvl <= 500; lvl++) {
+      const nodes = generateLevel(lvl);
+      const order = generateOrder(nodes.length);
+      levels.push({ nodes, order });
+    }
+    
+    /***** Game State Variables *****/
+    let currentLevelIndex = 0;
+    let nodes = [];
+    let order = [];
+    let connections = [];
+    let currentOrderIndex = 0;
+    let revealedCount = 3;
+    let isDrawing = false;
+    let currentPointer = { x: 0, y: 0 };
+    let paused = false;
+    let clueActive = false;
+    let snapThreshold = 25;
+    
+    /***** Canvas Setup *****/
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const miniMapCanvas = document.getElementById("miniMapCanvas");
+    const miniCtx = miniMapCanvas.getContext("2d");
+    const goodMessage = document.getElementById("goodMessage");
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+    
+    /***** Sign-Up Logic *****/
+    const signupContainer = document.getElementById("signupContainer");
+    const signupButton = document.getElementById("signupButton");
+    signupButton.addEventListener("click", function(){
+      const emailVal = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
+      if(emailVal === "" || password === "" || confirmPassword === ""){
+        alert("Please fill in all fields.");
+        return;
+      }
+      if(password !== confirmPassword){
+        alert("Passwords do not match.");
+        return;
+      }
+      userEmail = emailVal;
+      signupContainer.style.display = "none";
+      document.getElementById("gameContainer").style.display = "block";
+      initLevel();
+      showStartMenu();
+    });
+    
+    /***** Level Advancement & Scoring *****/
+    function nextLevel() {
+      score += order.length * 10;
+      let found = leaderboardData.find(entry => entry.email === userEmail);
+      if(found) {
+        found.score = score;
+      } else {
+        leaderboardData.push({ email: userEmail, score });
+      }
+      if(soundEnabled){
+        document.getElementById("completeSound").play();
+      }
+      launchConfetti();
+      currentLevelIndex++;
+      if (currentLevelIndex >= levels.length) {
+        alert("Congratulations, you've completed all 500 levels!");
+        currentLevelIndex = 0;
+      }
+      initLevel();
+      updateBackground();
+    }
+    
+    /***** Dynamic Background Update *****/
+    function updateBackground() {
+      let hue = (currentLevelIndex * 5) % 360;
+      let color1 = `hsl(${hue}, 60%, 50%)`;
+      let color2 = `hsl(${(hue+60)%360}, 60%, 50%)`;
+      document.body.style.background = `linear-gradient(135deg, ${color1}, ${color2})`;
+    }
+    
+    /***** Confetti Effect *****/
+    function launchConfetti() {
+      const confettiContainer = document.createElement('div');
+      confettiContainer.className = 'confetti-container';
+      document.body.appendChild(confettiContainer);
+      for (let i = 0; i < 50; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        const colors = ['#FFC107', '#28A745', '#17A2B8', '#DC3545', '#6F42C1'];
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.top = Math.random() * -20 + 'vh';
+        confettiContainer.appendChild(confetti);
+      }
+      setTimeout(() => {
+        confettiContainer.remove();
+      }, 3000);
+    }
+    
+    /***** Level Initialization *****/
+    function initLevel(){
+      const levelData = levels[currentLevelIndex];
+      nodes = levelData.nodes;
+      order = levelData.order;
+      connections = [];
+      currentOrderIndex = 0;
+      revealedCount = 3;
+      paused = false;
+      clueActive = false;
+      snapThreshold = 25 - ((currentLevelIndex) / (500 - 1)) * 10;
+      updateGameInfo();
+    }
+    
+    /***** Update Game Info *****/
+    function updateGameInfo() {
+      document.getElementById('levelDisplay').textContent = currentLevelIndex + 1;
+      document.getElementById('scoreDisplay').textContent = score;
+    }
+    
+    /***** Utility Functions *****/
+    function getNodePos(node) {
+      return { x: node.x * canvas.width, y: node.y * canvas.height };
+    }
+    function isNearNode(px, py, node) {
+      const pos = getNodePos(node);
+      const dx = px - pos.x, dy = py - pos.y;
+      return Math.sqrt(dx * dx + dy * dy) < snapThreshold;
+    }
+    function showGoodEffect(x, y) {
+      goodMessage.style.left = (x - 30) + "px";
+      goodMessage.style.top = (y - 40) + "px";
+      goodMessage.style.transform = "scale(1.2)";
+      goodMessage.style.opacity = 1;
+      setTimeout(() => {
+        goodMessage.style.opacity = 0;
+        goodMessage.style.transform = "scale(1)";
+      }, 800);
+      if(soundEnabled){
+        document.getElementById("successSound").play();
+      }
+    }
+    function revealNextGroup() {
+      if (revealedCount < order.length) {
+        revealedCount = Math.min(order.length, revealedCount + 3);
+      }
+    }
+    function updateRevealedCount() {
+      revealedCount = Math.min(order.length, Math.max(3, Math.ceil((currentOrderIndex + 1) / 3) * 3));
+    }
+    function getPointerPos(e) {
+      let clientX, clientY;
+      if(e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      const rect = canvas.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+    
+    /***** Leaderboard Update *****/
+    function updateLeaderboard() {
+      let sorted = leaderboardData.slice().sort((a, b) => b.score - a.score);
+      let rank = sorted.findIndex(entry => entry.email === userEmail) + 1;
+      let content = `<p>Your Rank: ${rank}</p><ul class="list-group">`;
+      sorted.forEach((entry, index) => {
+        content += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                      ${index + 1}. ${entry.email}
+                      <span class="badge bg-primary rounded-pill">${entry.score}</span>
+                    </li>`;
+      });
+      content += "</ul>";
+      document.getElementById("leaderboardContent").innerHTML = content;
+    }
+    
+    /***** Event Handlers for Drawing *****/
+    function pointerDown(e) {
+      if (paused) return;
+      const pos = getPointerPos(e);
+      if (isNearNode(pos.x, pos.y, nodes[order[currentOrderIndex]])) {
+        isDrawing = true;
+        currentPointer = pos;
+      }
+    }
+    function pointerMove(e) {
+      if (!isDrawing || paused) return;
+      e.preventDefault();
+      currentPointer = getPointerPos(e);
+      if (currentOrderIndex + 1 < revealedCount) {
+        const nextNode = nodes[order[currentOrderIndex + 1]];
+        if (isNearNode(currentPointer.x, currentPointer.y, nextNode)) {
+          const pos = getNodePos(nextNode);
+          currentPointer.x = pos.x;
+          currentPointer.y = pos.y;
+        }
+      }
+    }
+    function pointerUp(e) {
+      if (!isDrawing || paused) return;
+      isDrawing = false;
+      if (currentOrderIndex + 1 < order.length && currentOrderIndex + 1 < revealedCount) {
+        const nextNode = nodes[order[currentOrderIndex + 1]];
+        if (isNearNode(currentPointer.x, currentPointer.y, nextNode)) {
+          connections.push({ from: order[currentOrderIndex], to: order[currentOrderIndex + 1] });
+          currentOrderIndex++;
+          const pos = getNodePos(nextNode);
+          showGoodEffect(pos.x, pos.y);
+          if (currentOrderIndex === revealedCount - 1) {
+            revealNextGroup();
+          }
+          if (currentOrderIndex === order.length - 1) {
+            // Level complete: show the level complete modal after a short delay
+            setTimeout(() => { showLevelCompleteModal(); }, 500);
+          }
+        }
+      }
+    }
+    canvas.addEventListener("mousedown", pointerDown);
+    canvas.addEventListener("mousemove", pointerMove);
+    canvas.addEventListener("mouseup", pointerUp);
+    canvas.addEventListener("touchstart", pointerDown);
+    canvas.addEventListener("touchmove", pointerMove);
+    canvas.addEventListener("touchend", pointerUp);
+    
+    /***** Control Panel Button Handlers *****/
+    document.getElementById("restartBtn").addEventListener("click", () => { initLevel(); });
+    document.getElementById("undoBtn").addEventListener("click", () => {
+      if (connections.length > 0) {
+        connections.pop();
+        currentOrderIndex--;
+        updateRevealedCount();
+      }
+    });
+    document.getElementById("pauseBtn").addEventListener("click", () => {
+      if (!paused) {
+        paused = true;
+        showPauseMenu();
+      }
+    });
+    document.getElementById("clueBtn").addEventListener("click", () => {
+      if (currentOrderIndex + 1 < order.length) {
+        clueActive = true;
+        setTimeout(() => { clueActive = false; }, 800);
+      }
+    });
+    
+    /***** Drawing Functions *****/
+    function drawNode(node, index, context) {
+      const pos = getNodePos(node);
+      context.lineWidth = 2;
+      let fillColor = "#fff", strokeColor = "#333";
+      if (index === order[currentOrderIndex]) {
+        strokeColor = "#007BFF";
+        fillColor = "#e6f0ff";
+      }
+      if (clueActive && currentOrderIndex + 1 < order.length && index === order[currentOrderIndex + 1]) {
+        strokeColor = "#FF5722";
+        fillColor = "#ffe0b2";
+      }
+      context.strokeStyle = strokeColor;
+      context.fillStyle = fillColor;
+      const baseSize = (context === ctx ? 15 : 5);
+      const pulsate = (context === ctx ? 2 * Math.sin(performance.now() / 200) : 0);
+      const size = baseSize + pulsate;
+      context.beginPath();
+      if (node.shape === "circle") {
+        context.arc((context === miniCtx ? pos.x * miniMapCanvas.width / canvas.width : pos.x),
+                    (context === miniCtx ? pos.y * miniMapCanvas.height / canvas.height : pos.y),
+                    size, 0, Math.PI * 2);
+      } else if (node.shape === "square") {
+        if (context === miniCtx) {
+          context.rect(pos.x * miniMapCanvas.width / canvas.width - size,
+                       pos.y * miniMapCanvas.height / canvas.height - size,
+                       size * 2, size * 2);
+        } else {
+          context.rect(pos.x - size, pos.y - size, size * 2, size * 2);
+        }
+      } else if (node.shape === "rectangle") {
+        if (context === miniCtx) {
+          context.rect(pos.x * miniMapCanvas.width / canvas.width - size,
+                       pos.y * miniMapCanvas.height / canvas.height - size * 0.75,
+                       size * 2, size * 1.5);
+        } else {
+          context.rect(pos.x - size, pos.y - size * 0.75, size * 2, size * 1.5);
+        }
+      } else if (node.shape === "rhombus") {
+        let x = (context === miniCtx ? pos.x * miniMapCanvas.width / canvas.width : pos.x);
+        let y = (context === miniCtx ? pos.y * miniMapCanvas.height / canvas.height : pos.y);
+        context.moveTo(x, y - size);
+        context.lineTo(x + size, y);
+        context.lineTo(x, y + size);
+        context.lineTo(x - size, y);
+        context.closePath();
+      }
+      context.fill();
+      context.stroke();
+    }
+    function drawNodes() {
+      for (let i = 0; i < nodes.length; i++) {
+        if (order.indexOf(i) < revealedCount) {
+          drawNode(nodes[i], i, ctx);
+        } else {
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#aaa";
+          ctx.fillStyle = "#ddd";
+          const pos = getNodePos(nodes[i]);
+          const size = 15;
+          ctx.beginPath();
+          if (nodes[i].shape === "circle") {
+            ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+          } else {
+            ctx.rect(pos.x - size, pos.y - size, size * 2, size * 2);
+          }
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+    }
+    function drawConnections() {
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#007BFF";
+      connections.forEach(conn => {
+        const fromPos = getNodePos(nodes[conn.from]);
+        const toPos = getNodePos(nodes[conn.to]);
+        ctx.beginPath();
+        ctx.moveTo(fromPos.x, fromPos.y);
+        ctx.lineTo(toPos.x, toPos.y);
+        ctx.stroke();
+      });
+    }
+    function drawTempLine() {
+      if (!isDrawing) return;
+      const startPos = getNodePos(nodes[order[currentOrderIndex]]);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#999";
+      ctx.beginPath();
+      ctx.moveTo(startPos.x, startPos.y);
+      ctx.lineTo(currentPointer.x, currentPointer.y);
+      ctx.stroke();
+    }
+    function drawMiniMap() {
+      miniCtx.clearRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
+      const scaleX = miniMapCanvas.width / canvas.width;
+      const scaleY = miniMapCanvas.height / canvas.height;
+      if (currentLevelIndex < 100) {
+        miniCtx.lineWidth = 2;
+        miniCtx.strokeStyle = "#ccc";
+        for (let i = 0; i < order.length - 1; i++) {
+          const fromPos = getNodePos(nodes[order[i]]);
+          const toPos = getNodePos(nodes[order[i + 1]]);
+          miniCtx.beginPath();
+          miniCtx.moveTo(fromPos.x * scaleX, fromPos.y * scaleY);
+          miniCtx.lineTo(toPos.x * scaleX, toPos.y * scaleY);
+          miniCtx.stroke();
+        }
+      }
+      nodes.forEach((node, i) => {
+        miniCtx.lineWidth = 2;
+        miniCtx.fillStyle = "#eee";
+        miniCtx.strokeStyle = "#aaa";
+        drawNode(node, i, miniCtx);
+      });
+      miniCtx.lineWidth = 2;
+      miniCtx.strokeStyle = "#007BFF";
+      connections.forEach(conn => {
+        const fromPos = getNodePos(nodes[conn.from]);
+        const toPos = getNodePos(nodes[conn.to]);
+        miniCtx.beginPath();
+        miniCtx.moveTo(fromPos.x * scaleX, fromPos.y * scaleY);
+        miniCtx.lineTo(toPos.x * scaleX, toPos.y * scaleY);
+        miniCtx.stroke();
+      });
+    }
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawConnections();
+      drawTempLine();
+      drawNodes();
+      drawMiniMap();
+      requestAnimationFrame(animate);
+    }
+    animate();
+    
+    /***** Landing Page (Menu Overlay) *****/
+    function showStartMenu() {
+      document.getElementById("menuOverlay").innerHTML = `
+        <div id="landingTopBar" style="position: absolute; top: 1rem; left: 1rem; right: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <div class="dropdown">
+            <button class="btn btn-transparent" id="accountDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle" style="font-size:2rem; color:#fff;"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" id="accountCredentialsItem" href="#">Account Details</a></li>
+              <li><a class="dropdown-item" id="leaderboardItem" href="#">Leaderboard</a></li>
+              <li><a class="dropdown-item" id="helpItem" href="#">Help</a></li>
+            </ul>
+          </div>
+          <div>
+            <button id="landingSettingsBtn" class="btn btn-transparent" title="Settings">
+              <i class="bi bi-gear-fill" style="font-size:2rem; color:#fff;"></i>
+            </button>
+          </div>
+        </div>
+        <div style="text-align: center; color: #fff; padding: 2rem;">
+          <h1 class="landing-title">Deep Think Game</h1>
+          <p>Connect the nodes and unlock your potential!</p>
+          <button id="startGameBtn" class="btn btn-success btn-lg mt-4">
+            <i class="bi bi-play-fill"></i> Start Game
+          </button>
+        </div>
+      `;
+      document.getElementById("menuOverlay").style.display = "flex";
+
+      // Dropdown events:
+      document.getElementById("accountCredentialsItem").addEventListener("click", function() {
+        document.getElementById("modalEmailDisplay").textContent = userEmail;
+        document.getElementById("modalSoundDisplay").textContent = soundEnabled ? "On" : "Off";
+        document.getElementById("modalGameModeDisplay").textContent = gameMode;
+        document.getElementById("modalHintsDisplay").textContent = hintsEnabled ? "Yes" : "No";
+        document.getElementById("modalGraphicsDisplay").textContent = graphicsQuality;
+        var accountModal = new bootstrap.Modal(document.getElementById("accountModal"));
+        accountModal.show();
+      });
+      document.getElementById("leaderboardItem").addEventListener("click", function() {
+        updateLeaderboard();
+        var leaderboardModal = new bootstrap.Modal(document.getElementById("leaderboardModal"));
+        leaderboardModal.show();
+      });
+      document.getElementById("helpItem").addEventListener("click", function() {
+        var helpModal = new bootstrap.Modal(document.getElementById("helpModal"));
+        helpModal.show();
+      });
+
+      // Settings button event:
+      const settingsModal = new bootstrap.Modal(document.getElementById("settingsModal"));
+      document.getElementById("landingSettingsBtn").addEventListener("click", () => {
+        settingsModal.show();
+      });
+      
+      // Start game event:
+      document.getElementById("startGameBtn").addEventListener("click", () => {
+        startGame();
+      });
+    }
+    function startGame() {
+      paused = false;
+      document.getElementById("menuOverlay").style.display = "none";
+    }
+    function showPauseMenu() {
+      document.getElementById("menuOverlay").innerHTML = `
+        <div class="card text-center">
+          <div class="card-body">
+            <h2 class="card-title">Game Paused</h2>
+            <div class="btn-group mt-3">
+              <button id="homeBtn" class="btn btn-secondary"><i class="bi bi-house-fill"></i> Home</button>
+              <button id="restartPauseBtn" class="btn btn-danger"><i class="bi bi-arrow-counterclockwise"></i> Restart</button>
+              <button id="continueBtn" class="btn btn-success"><i class="bi bi-play-fill"></i> Continue</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById("menuOverlay").style.display = "flex";
+      document.getElementById("homeBtn").addEventListener("click", () => {
+        currentLevelIndex = 0;
+        score = 0;
+        initLevel();
+        showStartMenu();
+      });
+      document.getElementById("restartPauseBtn").addEventListener("click", () => {
+        initLevel();
+        startGame();
+      });
+      document.getElementById("continueBtn").addEventListener("click", () => {
+        startGame();
+      });
+    }
+    
+    /***** Level Complete Modal *****/
+    function showLevelCompleteModal() {
+      var levelCompleteModal = new bootstrap.Modal(document.getElementById("levelCompleteModal"));
+      levelCompleteModal.show();
+      document.getElementById("playAgainBtn").addEventListener("click", () => {
+        initLevel();
+        levelCompleteModal.hide();
+      });
+      document.getElementById("nextLevelBtn").addEventListener("click", () => {
+        nextLevel();
+        levelCompleteModal.hide();
+      });
+    }
+    
+    /***** Settings Form Submission *****/
+    document.getElementById("settingsForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const soundVal = document.getElementById("soundToggle").value;
+      const modeVal = document.getElementById("gameMode").value;
+      const hintsVal = document.getElementById("hintsToggle").value;
+      const graphicsVal = document.getElementById("graphicsQuality").value;
+      soundEnabled = (soundVal === "on");
+      gameMode = modeVal;
+      hintsEnabled = (hintsVal === "yes");
+      graphicsQuality = graphicsVal;
+      alert("Settings saved!");
+      var modal = bootstrap.Modal.getInstance(document.getElementById("settingsModal"));
+      modal.hide();
+    });
+  </script>
+</body>
+</html>
